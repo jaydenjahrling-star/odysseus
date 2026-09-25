@@ -51,7 +51,7 @@
     {
       id: "themed", glyph: "{A}", name: "Themed",
       desc: "A random theme is picked. Normal rules, but every word has to fit it.",
-      guide: "A theme such as Animals, Food & Drink or Places is picked at random. Chaining works like Normal, and every word must belong to the theme. With two or more people playing, a real word that isn't on the theme list goes to a quick vote.",
+      guide: "A theme such as Animals, Food & Drink or Places is picked at random. Chaining works like Normal, and every word must belong to the theme. Themes are broad: anything on the theme list counts right away, and any other answer (slang and nicknames included) goes to a quick call. With other people playing, they vote. Playing alone, you make the call.",
     },
     {
       id: "solo", glyph: "1P", name: "Solo",
@@ -511,7 +511,7 @@
   const isReal = (w) => DICT.has(w);
 
   // Rule checks. Returns an error string, "" when fine, or "vote" when the
-  // word is real but not on the theme list and the table can vote on it.
+  // word isn't on the theme list and the players have to judge whether it fits.
   function checkWord(w) {
     const themed = !!G.theme;
     if (!(themed ? /^[a-z]+( [a-z]+)*$/ : /^[a-z]+$/).test(w)) return "Letters only, no spaces or symbols.";
@@ -522,10 +522,9 @@
     const rep = repeatOf(w);
     if (rep) return rep === w ? `“${w}” was already used.` : `“${w}” repeats “${rep}”.`;
     if (themed) {
-      if (inTheme(w)) return "";
-      if (!isReal(w)) return `“${w}” isn't a real word.`;
-      if (G.humans > 1 && !G.solo) return "vote";
-      return `“${w}” isn't on the ${G.theme.name} list.`;
+      // Themes are meant to be broad, so anything off the list (slang,
+      // nicknames, made-up animals like "liger") is judged by the players.
+      return inTheme(w) ? "" : "vote";
     }
     if (!isReal(w)) return `“${w}” isn't a real word.`;
     return "";
@@ -543,10 +542,15 @@
     accept(w);
   }
 
-  // A real word that isn't on the theme list: the other players decide.
+  // A word that isn't on the theme list: the other players decide, or the
+  // player themselves when nobody else is playing.
   function askVote(w) {
     pauseClock();
+    const table = G.humans > 1 && !G.solo;
+    $("vote-title").textContent = table ? "Table vote" : "Your call";
     $("vote-q").innerHTML = `Does <b>${esc(w)}</b> fit <b>${esc(G.theme.name)}</b>?`;
+    $("vote-note").textContent = (isReal(w) ? "It's not on the theme list." : "It's not on the theme list or in the dictionary.") +
+      (table ? " The other players decide." : " You decide, so play fair.") + " The clock is paused.";
     $("vote").hidden = false;
     G.voteWord = w;
   }
@@ -557,8 +561,8 @@
     G.voteWord = null;
     $("vote").hidden = true;
     resumeClock();
-    if (yes) accept(w);
-    else mistake(`The table voted “${w}” off-theme.`);
+    if (yes) accept(w, true);
+    else mistake(`“${w}” was ruled off-theme.`);
   }
 
   // Strict rules: any mistake ends the turn and costs a life (or points).
@@ -584,7 +588,7 @@
     $("word-input").select();
   }
 
-  function accept(w) {
+  function accept(w, judged) {
     stopClock();
     const p = G.players[G.turn];
     const player = G.turn;
@@ -604,7 +608,7 @@
     p.score += pts;
     p.words += 1;
     G.used.add(w);
-    G.chain.push({ word: w, by: player, pts });
+    G.chain.push({ word: w, by: player, pts, judged: !!judged });
     G.accepted += 1;
     G.turnCount += 1;
     beep(660, 0.08, 0.06);
@@ -758,7 +762,7 @@
         word = markLinks(c.word, prev ? L : 0, L);
       }
       return `<li class="${i === lastIdx ? "latest" : ""}"><span class="w">${word}</span>
-        <span class="meta">${who}${pts}</span></li>`;
+        <span class="meta">${who}${pts}${c.judged ? `<span class="judged">judged</span>` : ""}</span></li>`;
     }).join("");
     const wrap = list.parentElement;
     wrap.scrollTop = wrap.scrollHeight;

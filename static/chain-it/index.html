@@ -111,7 +111,7 @@
         <ul>
           <li>Player 1 opens with any word.</li>
           <li>Every next word must start with the <b>last letter</b> of the word before it. <span class="eg">tiger → rabbit → tomato</span></li>
-          <li>Every word must be a real English word. Words are checked against a built-in dictionary of about 80,000 words, so it works offline.</li>
+          <li>Every word must be a real English word. Words are checked against a built-in dictionary of about 115,000 words plus common slang, so it works offline.</li>
           <li>No repeats, in every mode. Once a word is in the chain it is gone for the game, and so is its plural or singular (<i>cat</i> blocks <i>cats</i>).</li>
           <li>Run out of time and you lose a life. The next player gets the same letter.</li>
           <li>Any mistake costs a life right away: wrong starting letter, a repeat, a word that's too short or not a real word. Turn this off in Rules to allow retries while the clock runs.</li>
@@ -185,9 +185,9 @@
 
     <div class="overlay" id="vote" hidden>
       <div class="overlay-card">
-        <p class="eyebrow">Table vote</p>
+        <p class="eyebrow" id="vote-title">Table vote</p>
         <p class="handoff-name small" id="vote-q">Does it fit?</p>
-        <p class="handoff-need">It's a real word but not on the theme list. The other players decide. The clock is paused.</p>
+        <p class="handoff-need" id="vote-note">It's not on the theme list. The other players decide. The clock is paused.</p>
         <div class="row center">
           <button class="btn danger" type="button" id="vote-no">Doesn't fit</button>
           <button class="btn primary" type="button" id="vote-yes">It fits</button>
