@@ -1,0 +1,849 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Wine-Dark Sudoku</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Karla:wght@400;500;600;700&display=swap">
+<style>
+:root {
+  --bg: #EDF1F3;
+  --surface: #F8FAFB;
+  --ink: #15212D;
+  --muted: #5B6977;
+  --line: #C9D2DA;
+  --line-strong: #2B3B4B;
+  --accent: #9C6A22;
+  --accent-ink: #FFFFFF;
+  --sel: #CFE0EC;
+  --peer: #E3EBF1;
+  --same: #F1DDB5;
+  --flash: #F3D79E;
+  --err: #B2352A;
+  --err-bg: #F7DDDA;
+  --user: #1D5A85;
+  --scrim: rgba(21, 33, 45, .42);
+  --shadow: 0 10px 30px rgba(21, 33, 45, .14);
+  --display: "Marcellus", "Palatino Linotype", Palatino, Georgia, serif;
+  --body: "Karla", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #130E1B; --surface: #1C1527; --ink: #EEE7DB; --muted: #A69CB2;
+    --line: #372D46; --line-strong: #948AA6; --accent: #D8A650; --accent-ink: #1A1206;
+    --sel: #3B2E52; --peer: #231B31; --same: #4E3B1F; --flash: #6A4E22;
+    --err: #FF7B6C; --err-bg: #3D1C22; --user: #92C6EA;
+    --scrim: rgba(5, 3, 9, .6); --shadow: 0 10px 30px rgba(0, 0, 0, .5);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #130E1B; --surface: #1C1527; --ink: #EEE7DB; --muted: #A69CB2;
+  --line: #372D46; --line-strong: #948AA6; --accent: #D8A650; --accent-ink: #1A1206;
+  --sel: #3B2E52; --peer: #231B31; --same: #4E3B1F; --flash: #6A4E22;
+  --err: #FF7B6C; --err-bg: #3D1C22; --user: #92C6EA;
+  --scrim: rgba(5, 3, 9, .6); --shadow: 0 10px 30px rgba(0, 0, 0, .5);
+}
+
+[hidden] { display: none !important; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 15px;
+  -webkit-user-select: none; user-select: none;
+  touch-action: manipulation;
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.app {
+  max-width: 500px;
+  margin: 0 auto;
+  padding-inline: 16px;
+  padding-block: 10px 18px;
+  display: flex; flex-direction: column; gap: 12px;
+  min-height: 100%;
+}
+
+/* Horizon: the only clock in the game is the sky over the voyage */
+.horizon {
+  position: relative;
+  height: 64px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--sky-top, #8FC6E8), var(--sky-bottom, #D5EAF4));
+  transition: background 2s ease;
+}
+.horizon .sea {
+  position: absolute; inset: auto 0 0 0; height: 20px;
+  background: linear-gradient(180deg, var(--sea-top, #3F79A0), var(--sea-bottom, #244B6A));
+  transition: background 2s ease;
+}
+.horizon .sun {
+  position: absolute; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--sun, #FFE7A8);
+  box-shadow: 0 0 18px 6px var(--sun-glow, rgba(255, 231, 168, .6));
+  left: var(--sun-x, 50%); top: var(--sun-y, 12px);
+  transform: translate(-50%, 0);
+  transition: left 2s ease, top 2s ease, background 2s ease;
+}
+.horizon .ship {
+  position: absolute; bottom: 13px; left: var(--ship-x, 10%);
+  width: 26px; height: 16px;
+  transition: left 1.2s ease;
+}
+.horizon .place {
+  position: absolute; left: 12px; top: 8px; right: 12px;
+  display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+  color: var(--sky-ink, #10283B);
+  text-shadow: 0 1px 0 var(--sky-shadow, rgba(255,255,255,.35));
+}
+.place .name { font-family: var(--display); font-size: 19px; letter-spacing: .01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.place .leg { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; opacity: .85; white-space: nowrap; }
+
+.bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.sea-state { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.sea-state .label { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.sea-state .value { font-family: var(--display); font-size: 17px; }
+.waves { display: inline-flex; gap: 2px; vertical-align: middle; margin-left: 6px; }
+.waves i { width: 4px; height: 10px; border-radius: 2px; background: var(--line); }
+.waves i.on { background: var(--accent); }
+.tools { display: flex; gap: 6px; }
+.icon-btn {
+  width: 38px; height: 38px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--surface);
+  display: grid; place-items: center;
+}
+.icon-btn svg { width: 18px; height: 18px; stroke: var(--ink); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.icon-btn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); }
+.icon-btn[aria-pressed="true"] svg { stroke: var(--accent-ink); }
+
+/* Board */
+.board-wrap { position: relative; display: flex; justify-content: center; }
+.grid {
+  width: min(100%, 60vh, 468px);
+  aspect-ratio: 1;
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  grid-template-rows: repeat(9, 1fr);
+  border: 2px solid var(--line-strong);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.cell {
+  position: relative;
+  border: 0;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  padding: 0;
+  display: grid; place-items: center;
+  font-variant-numeric: tabular-nums;
+  transition: background-color .15s ease;
+}
+.cell.c8 { border-right: 0; }
+.cell.r8 { border-bottom: 0; }
+.cell.br { border-right: 2px solid var(--line-strong); }
+.cell.bb { border-bottom: 2px solid var(--line-strong); }
+.cell.peer { background: var(--peer); }
+.cell.same { background: var(--same); }
+.cell.sel { background: var(--sel); }
+.cell .v {
+  font-size: clamp(20px, 6.4vw, 30px);
+  font-weight: 500;
+  line-height: 1;
+}
+.cell.given .v { font-weight: 700; color: var(--ink); }
+.cell.user .v { color: var(--user); font-weight: 600; }
+.cell.wrong { background: var(--err-bg); }
+.cell.wrong .v { color: var(--err); text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.cell .notes {
+  position: absolute; inset: 2px;
+  display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
+  font-size: clamp(8px, 2.3vw, 11px);
+  font-weight: 600;
+  color: var(--muted);
+  line-height: 1;
+}
+.cell .notes span { display: grid; place-items: center; border-radius: 3px; }
+.cell .notes span.hot { background: var(--accent); color: var(--accent-ink); }
+.cell.flash { animation: flash .9s ease-out both; animation-delay: var(--d, 0ms); }
+@keyframes flash {
+  0% { background: var(--surface); }
+  25% { background: var(--flash); }
+  100% { background: var(--surface); }
+}
+.cell.pop .v { animation: pop .25s ease-out; }
+@keyframes pop { 0% { transform: scale(.6); } 70% { transform: scale(1.12); } 100% { transform: scale(1); } }
+.cell.shake { animation: shake .3s ease-in-out; }
+@keyframes shake { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+
+.combo {
+  position: absolute; top: -12px; right: 4px;
+  background: var(--accent); color: var(--accent-ink);
+  font-weight: 700; font-size: 12px; letter-spacing: .04em;
+  padding: 4px 9px; border-radius: 999px;
+  box-shadow: var(--shadow);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.combo.bump { animation: bump .3s ease-out; }
+@keyframes bump { 50% { transform: scale(1.18); } }
+
+/* Controls */
+.actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.act {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  background: transparent; border: 0; padding: 6px 0; border-radius: 10px;
+  color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .03em;
+}
+.act svg { width: 22px; height: 22px; stroke: var(--ink); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.act[aria-pressed="true"] { color: var(--accent); }
+.act[aria-pressed="true"] svg { stroke: var(--accent); }
+.act .tag { font-size: 10px; }
+
+.pad { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 5px; }
+.key {
+  aspect-ratio: 3 / 4;
+  max-height: 64px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  font-variant-numeric: tabular-nums;
+}
+.key b { font-size: clamp(20px, 6vw, 26px); font-weight: 600; color: var(--user); line-height: 1; }
+.key small { font-size: 10px; color: var(--muted); font-weight: 600; }
+.key.done { opacity: .28; }
+.key.lit { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.notes-on .key b { font-size: clamp(14px, 4vw, 17px); color: var(--muted); }
+
+.foot { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 12px; padding-top: 2px; }
+.foot button { background: none; border: 0; padding: 0; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; font-size: 12px; }
+
+/* Sheets */
+.scrim {
+  position: fixed; inset: 0; z-index: 20;
+  background: var(--scrim);
+  display: flex; align-items: flex-end; justify-content: center;
+  padding: 16px;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  animation: fade .25s ease-out;
+}
+@keyframes fade { from { opacity: 0; } }
+.sheet {
+  width: 100%; max-width: 468px; max-height: 86vh; overflow-y: auto;
+  background: var(--surface); color: var(--ink);
+  border-radius: 18px; padding: 22px 20px 18px;
+  box-shadow: var(--shadow);
+  display: flex; flex-direction: column; gap: 14px;
+  animation: rise .35s cubic-bezier(.2, .9, .3, 1.1);
+}
+@keyframes rise { from { transform: translateY(24px); opacity: 0; } }
+.sheet h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 26px; text-wrap: balance; }
+.sheet .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+.sheet p { margin: 0; line-height: 1.5; color: var(--muted); max-width: 62ch; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.stat { border: 1px solid var(--line); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 2px; }
+.stat .k { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.stat .n { font-family: var(--display); font-size: 22px; font-variant-numeric: tabular-nums; }
+.rest {
+  border-radius: 12px; padding: 12px;
+  background: var(--peer);
+  font-size: 13px; line-height: 1.45;
+}
+.primary {
+  position: relative; overflow: hidden;
+  border: 0; border-radius: 12px; padding: 14px;
+  background: var(--accent); color: var(--accent-ink);
+  font-weight: 700; font-size: 16px; letter-spacing: .02em;
+}
+.primary .fill {
+  position: absolute; inset: 0 auto 0 0; width: 0;
+  background: rgba(255, 255, 255, .22);
+}
+.primary.counting .fill { animation: count var(--dur, 6s) linear forwards; }
+@keyframes count { to { width: 100%; } }
+.primary span { position: relative; }
+.secondary { border: 1px solid var(--line); background: transparent; border-radius: 12px; padding: 12px; font-weight: 600; }
+.why { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 9px; line-height: 1.45; font-size: 14px; }
+.why b { color: var(--ink); }
+.why li { color: var(--muted); }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0ms !important; transition-duration: .01ms !important; }
+}
+@media (max-height: 640px) {
+  .horizon { height: 48px; }
+  .place .name { font-size: 16px; }
+}
+</style>
+
+<div class="app" id="app">
+  <header class="horizon" id="horizon" aria-label="Voyage progress">
+    <div class="sun" id="sun"></div>
+    <div class="sea"></div>
+    <svg class="ship" id="ship" viewBox="0 0 26 16" aria-hidden="true">
+      <path d="M2 10 H24 L20 15 H6 Z" fill="#2A1A10"/>
+      <path d="M13 1 V10" stroke="#2A1A10" stroke-width="1.4"/>
+      <path d="M13.8 2 L21 9 H13.8 Z" fill="#F4EBDD"/>
+      <path d="M12.2 3 L7 9 H12.2 Z" fill="#E8DCCB"/>
+    </svg>
+    <div class="place">
+      <span class="name" id="placeName">Ismarus</span>
+      <span class="leg" id="legLabel">Island 1</span>
+    </div>
+  </header>
+
+  <div class="bar">
+    <div class="sea-state">
+      <span class="label">Sea state</span>
+      <span class="value"><span id="seaName">Light breeze</span><span class="waves" id="waves" aria-hidden="true"></span></span>
+    </div>
+    <div class="tools">
+      <button class="icon-btn" id="soundBtn" aria-pressed="false" aria-label="Sound">
+        <svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path d="M19 6a8.5 8.5 0 0 1 0 12"/></svg>
+      </button>
+      <button class="icon-btn" id="infoBtn" aria-label="How this game makes time fly">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><path d="M12 7.5v.01"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="board-wrap">
+    <div class="grid" id="grid" role="grid" aria-label="Sudoku board"></div>
+    <div class="combo" id="combo" hidden>×0</div>
+  </div>
+
+  <div class="actions">
+    <button class="act" id="undoBtn"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>Undo</button>
+    <button class="act" id="eraseBtn"><svg viewBox="0 0 24 24"><path d="M20 20H9L4 15l10-10 7 7-8 8"/><path d="M8 11l6 6"/></svg>Erase</button>
+    <button class="act" id="notesBtn" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg>Notes <span class="tag" id="notesTag">off</span></button>
+    <button class="act" id="hintBtn"><svg viewBox="0 0 24 24"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z"/></svg>Hint</button>
+  </div>
+
+  <div class="pad" id="pad"></div>
+
+  <div class="foot">
+    <span id="footStat">0 islands charted</span>
+    <button id="newBtn">New puzzle</button>
+  </div>
+</div>
+
+<div class="scrim" id="winSheet" hidden>
+  <div class="sheet" role="dialog" aria-labelledby="winTitle">
+    <span class="eyebrow" id="winEyebrow">Island charted</span>
+    <h2 id="winTitle">Landfall at Ismarus</h2>
+    <div class="stats">
+      <div class="stat"><span class="k">Slips</span><span class="n" id="wMistakes">0</span></div>
+      <div class="stat"><span class="k">Hints</span><span class="n" id="wHints">0</span></div>
+      <div class="stat"><span class="k">Best run</span><span class="n" id="wCombo">0</span></div>
+    </div>
+    <p id="winNote">The wind rises. The next island has fewer givens.</p>
+    <div class="rest" id="restNote" hidden></div>
+    <button class="primary" id="sailBtn"><span class="fill"></span><span id="sailLabel">Sail on</span></button>
+    <button class="secondary" id="stayBtn">Stay in port</button>
+  </div>
+</div>
+
+<div class="scrim" id="infoSheet" hidden>
+  <div class="sheet" role="dialog" aria-labelledby="infoTitle">
+    <span class="eyebrow">Ship's log</span>
+    <h2 id="infoTitle">Why the hours slip away</h2>
+    <ol class="why">
+      <li><b>No clock anywhere.</b> Checking the time is what makes it drag. Here the only sign of time is the sky: it moves from dawn to night as you chart islands, not as minutes pass.</li>
+      <li><b>The sea matches your skill.</b> Flow happens when the challenge sits just above your ability. Clean solves roughen the sea (fewer givens); slips and hints calm it. You stay in the channel between boredom and frustration.</li>
+      <li><b>No stopping point.</b> The next island loads by itself after a few seconds, like the next episode of a show. There is no menu to fall back to.</li>
+      <li><b>Instant feedback.</b> Every correct digit pops, finished rows, columns and boxes ripple, and a run counter climbs. With sound on, each run plays a rising scale.</li>
+      <li><b>No busywork.</b> Notes clear themselves when you place a digit, matching digits light up, and finished numbers fade from the pad. Your attention stays on the logic.</li>
+      <li><b>A voyage to follow.</b> Islands form legs, and legs form a journey home to Ithaca. Progress you can see is what keeps "one more" going.</li>
+      <li><b>Rest built in.</b> After each leg of six islands you get a 20-second eye break. Over eight hours this keeps your eyes and focus fresh, so the flow lasts.</li>
+    </ol>
+    <div class="row2">
+      <button class="secondary" id="easierBtn">Calmer seas</button>
+      <button class="secondary" id="harderBtn">Rougher seas</button>
+    </div>
+    <button class="primary" id="infoClose"><span>Back to the helm</span></button>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---------- storage ----------
+  const KEY = "wds-state-v1";
+  const load = () => { try { const v = localStorage.getItem(KEY); return v ? JSON.parse(v) : null; } catch (e) { return null; } };
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+
+  // ---------- sudoku core ----------
+  const R = i => (i / 9) | 0, C = i => i % 9, B = i => ((R(i) / 3) | 0) * 3 + ((C(i) / 3) | 0);
+  const PEERS = [];
+  for (let i = 0; i < 81; i++) {
+    const p = [];
+    for (let j = 0; j < 81; j++) if (j !== i && (R(j) === R(i) || C(j) === C(i) || B(j) === B(i))) p.push(j);
+    PEERS.push(p);
+  }
+  const UNIT = { r: [], c: [], b: [] };
+  for (let k = 0; k < 9; k++) { UNIT.r.push([]); UNIT.c.push([]); UNIT.b.push([]); }
+  for (let i = 0; i < 81; i++) { UNIT.r[R(i)].push(i); UNIT.c[C(i)].push(i); UNIT.b[B(i)].push(i); }
+
+  const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const bits = m => { let n = 0; while (m) { m &= m - 1; n++; } return n; };
+
+  // Counts solutions up to `limit`; returns the first one found.
+  function solve(grid, limit, random) {
+    const a = grid.slice();
+    const rows = new Array(9).fill(0), cols = new Array(9).fill(0), boxes = new Array(9).fill(0);
+    for (let i = 0; i < 81; i++) if (a[i]) {
+      const b = 1 << a[i];
+      if (rows[R(i)] & b || cols[C(i)] & b || boxes[B(i)] & b) return { count: 0, sol: null };
+      rows[R(i)] |= b; cols[C(i)] |= b; boxes[B(i)] |= b;
+    }
+    let count = 0, sol = null;
+    (function rec() {
+      let best = -1, bestMask = 0, bestN = 10;
+      for (let i = 0; i < 81; i++) if (!a[i]) {
+        const m = ~(rows[R(i)] | cols[C(i)] | boxes[B(i)]) & 0x3FE;
+        const n = bits(m);
+        if (n === 0) return false;
+        if (n < bestN) { best = i; bestMask = m; bestN = n; if (n === 1) break; }
+      }
+      if (best < 0) { count++; if (!sol) sol = a.slice(); return count >= limit; }
+      const ds = [];
+      for (let d = 1; d <= 9; d++) if (bestMask & (1 << d)) ds.push(d);
+      if (random) shuffle(ds);
+      const r = R(best), c = C(best), bx = B(best);
+      for (const d of ds) {
+        const b = 1 << d;
+        a[best] = d; rows[r] |= b; cols[c] |= b; boxes[bx] |= b;
+        if (rec()) return true;
+        a[best] = 0; rows[r] &= ~b; cols[c] &= ~b; boxes[bx] &= ~b;
+      }
+      return false;
+    })();
+    return { count, sol };
+  }
+
+  const cluesFor = level => Math.round(46 - (level - 1) * 2.4); // level 1 → 46 givens, level 10 → 24
+
+  function generate(level) {
+    const solution = solve(new Array(81).fill(0), 1, true).sol;
+    const target = cluesFor(level);
+    const p = solution.slice();
+    let clues = 81;
+    for (const i of shuffle([...Array(41).keys()])) {
+      if (clues <= target) break;
+      const j = 80 - i, bi = p[i], bj = p[j];
+      p[i] = 0; p[j] = 0;
+      if (solve(p, 2, false).count !== 1) { p[i] = bi; p[j] = bj; }
+      else clues -= (i === j ? 1 : 2);
+    }
+    // Symmetric removal stalls around 28 givens; single removals reach the hardest seas.
+    for (const i of shuffle([...Array(81).keys()])) {
+      if (clues <= target) break;
+      if (!p[i]) continue;
+      const bi = p[i];
+      p[i] = 0;
+      if (solve(p, 2, false).count !== 1) p[i] = bi; else clues--;
+    }
+    return { puzzle: p, solution, clues };
+  }
+
+  // ---------- voyage flavour ----------
+  const ISLANDS = ["Ismarus", "Isle of the Lotus-Eaters", "Isle of the Cyclopes", "Aeolia", "Telepylos", "Aeaea",
+    "Shore of the Dead", "Rocks of the Sirens", "Scylla's Strait", "Thrinacia", "Ogygia", "Scheria", "Ithaca"];
+  const SEAS = ["Glassy calm", "Still water", "Light air", "Light breeze", "Gentle breeze", "Open sea", "Fresh wind", "Heavy swell", "Gale", "Poseidon's storm"];
+  const seaName = lvl => SEAS[Math.max(0, Math.min(9, Math.round(lvl) - 1))];
+  const islandName = n => ISLANDS[n % ISLANDS.length];
+
+  // Sky keyframes across one "day" of islands. Progress, not minutes, moves the sun.
+  const SKY = [
+    { top: "#F4B991", bottom: "#A9C7E0", sea: ["#5B87A8", "#2E5575"], sun: "#FFD6A0", ink: "#2A1C14", shadow: "rgba(255,255,255,.35)" }, // dawn
+    { top: "#7FBDE6", bottom: "#D3EAF5", sea: ["#3C7AA4", "#22496A"], sun: "#FFF1C4", ink: "#0F2638", shadow: "rgba(255,255,255,.4)" },  // noon
+    { top: "#D9825E", bottom: "#F2C38C", sea: ["#6A4F72", "#3A2A4A"], sun: "#FFB070", ink: "#2A140E", shadow: "rgba(255,255,255,.3)" },  // dusk
+    { top: "#161B3A", bottom: "#3A2E5E", sea: ["#241B3A", "#120D20"], sun: "#E9E6F5", ink: "#EDE8F7", shadow: "rgba(0,0,0,.4)" },      // night
+  ];
+  const DAY = 12; // islands per full day in the sky
+
+  // ---------- state ----------
+  let S = load();
+  const fresh = (level, solved, extra) => {
+    const g = generate(level);
+    return Object.assign({
+      puzzle: g.puzzle, solution: g.solution, clues: g.clues,
+      board: g.puzzle.slice(), notes: new Array(81).fill(0),
+      level, solved, mistakes: 0, hints: 0, combo: 0, bestCombo: 0,
+      started: Date.now(), activeMs: 0,
+      notesMode: false, sound: false,
+    }, extra || {});
+  };
+  if (!S || !Array.isArray(S.board) || S.board.length !== 81) S = fresh(3, 0);
+  let sel = -1, history = [], nextGen = null, lastTick = Date.now(), countdown = null, audio = null;
+
+  // Track active play time internally for difficulty tuning only. It is never shown.
+  const tick = () => { const now = Date.now(); if (!document.hidden && winSheet.hidden) S.activeMs += Math.min(now - lastTick, 60000); lastTick = now; };
+
+  // ---------- DOM ----------
+  const $ = id => document.getElementById(id);
+  const grid = $("grid"), pad = $("pad"), comboEl = $("combo"), winSheet = $("winSheet"), infoSheet = $("infoSheet");
+  const cells = [];
+  for (let i = 0; i < 81; i++) {
+    const b = document.createElement("button");
+    b.className = "cell" + (C(i) === 2 || C(i) === 5 ? " br" : "") + (R(i) === 2 || R(i) === 5 ? " bb" : "") + (C(i) === 8 ? " c8" : "") + (R(i) === 8 ? " r8" : "");
+    b.setAttribute("role", "gridcell");
+    b.innerHTML = '<span class="v"></span><span class="notes">' + "<span></span>".repeat(9) + "</span>";
+    b.addEventListener("pointerdown", e => { e.preventDefault(); select(i); });
+    grid.appendChild(b);
+    cells.push({ el: b, v: b.firstChild, notes: [...b.lastChild.children] });
+  }
+  const keys = [];
+  for (let d = 1; d <= 9; d++) {
+    const k = document.createElement("button");
+    k.className = "key";
+    k.innerHTML = `<b>${d}</b><small></small>`;
+    k.addEventListener("pointerdown", e => { e.preventDefault(); input(d); });
+    pad.appendChild(k);
+    keys.push(k);
+  }
+  const wavesEl = $("waves");
+  for (let i = 0; i < 10; i++) wavesEl.appendChild(document.createElement("i"));
+
+  // ---------- rendering ----------
+  function render() {
+    const selVal = sel >= 0 ? S.board[sel] : 0;
+    const counts = new Array(10).fill(0);
+    for (let i = 0; i < 81; i++) if (S.board[i] && S.board[i] === S.solution[i]) counts[S.board[i]]++;
+    for (let i = 0; i < 81; i++) {
+      const c = cells[i], v = S.board[i], given = S.puzzle[i] !== 0;
+      const wrong = v && v !== S.solution[i];
+      const cl = c.el.classList;
+      cl.toggle("given", given);
+      cl.toggle("user", !given && !!v);
+      cl.toggle("wrong", !!wrong);
+      cl.toggle("sel", i === sel);
+      cl.toggle("peer", sel >= 0 && i !== sel && PEERS[sel].includes(i));
+      cl.toggle("same", !!selVal && i !== sel && v === selVal);
+      c.v.textContent = v || "";
+      const m = v ? 0 : S.notes[i];
+      for (let d = 1; d <= 9; d++) {
+        const on = !!(m & (1 << d));
+        c.notes[d - 1].textContent = on ? d : "";
+        c.notes[d - 1].classList.toggle("hot", on && d === selVal);
+      }
+      c.el.setAttribute("aria-label", `Row ${R(i) + 1} column ${C(i) + 1}, ${v || "empty"}`);
+    }
+    keys.forEach((k, idx) => {
+      const d = idx + 1, left = 9 - counts[d];
+      k.classList.toggle("done", left === 0);
+      k.classList.toggle("lit", d === selVal);
+      k.lastChild.textContent = left || "";
+      k.setAttribute("aria-label", `Digit ${d}, ${left} left`);
+    });
+    $("notesBtn").setAttribute("aria-pressed", S.notesMode);
+    $("notesTag").textContent = S.notesMode ? "on" : "off";
+    pad.classList.toggle("notes-on", S.notesMode);
+    $("soundBtn").setAttribute("aria-pressed", S.sound);
+    comboEl.hidden = S.combo < 3;
+    comboEl.textContent = "Run ×" + S.combo;
+    renderVoyage();
+  }
+
+  function mix(a, b, t) {
+    const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+    const ch = s => [(s >> 16) & 255, (s >> 8) & 255, s & 255];
+    const [x, y] = [ch(pa), ch(pb)];
+    return "#" + x.map((v, k) => Math.round(v + (y[k] - v) * t).toString(16).padStart(2, "0")).join("");
+  }
+  function renderVoyage() {
+    const n = S.solved;
+    const phase = (n % DAY) / DAY * SKY.length;
+    const k = Math.floor(phase), t = phase - k;
+    const a = SKY[k], b = SKY[(k + 1) % SKY.length];
+    const h = $("horizon").style;
+    h.setProperty("--sky-top", mix(a.top, b.top, t));
+    h.setProperty("--sky-bottom", mix(a.bottom, b.bottom, t));
+    h.setProperty("--sea-top", mix(a.sea[0], b.sea[0], t));
+    h.setProperty("--sea-bottom", mix(a.sea[1], b.sea[1], t));
+    h.setProperty("--sun", mix(a.sun, b.sun, t));
+    h.setProperty("--sky-ink", t < .5 ? a.ink : b.ink);
+    h.setProperty("--sky-shadow", t < .5 ? a.shadow : b.shadow);
+    // Sun (then moon) arcs across the half-day
+    const half = ((n % DAY) / DAY * 2) % 1;
+    h.setProperty("--sun-x", (22 + half * 70) + "%");
+    h.setProperty("--sun-y", (34 - Math.sin(half * Math.PI) * 26) + "px");
+    h.setProperty("--ship-x", (6 + ((n % 6) / 6) * 78) + "%");
+    $("placeName").textContent = islandName(n);
+    $("legLabel").textContent = `Leg ${Math.floor(n / 6) + 1} · Island ${(n % 6) + 1}/6`;
+    $("seaName").textContent = seaName(S.level);
+    [...wavesEl.children].forEach((w, i) => w.classList.toggle("on", i < Math.round(S.level)));
+    $("footStat").textContent = `${n} island${n === 1 ? "" : "s"} charted · ${S.clues} givens`;
+  }
+
+  // ---------- sound ----------
+  const SCALE = [0, 2, 4, 7, 9]; // major pentatonic
+  function note(step, gain, delay) {
+    if (!S.sound) return;
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      if (audio.state === "suspended") audio.resume();
+      const oct = Math.floor(step / 5), semi = SCALE[step % 5] + oct * 12;
+      const f = 261.63 * Math.pow(2, Math.min(semi, 30) / 12);
+      const t0 = audio.currentTime + (delay || 0);
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.type = "sine"; o.frequency.value = f;
+      g.gain.setValueAtTime(0, t0);
+      g.gain.linearRampToValueAtTime(gain || .08, t0 + .015);
+      g.gain.exponentialRampToValueAtTime(.0001, t0 + .9);
+      o.connect(g).connect(audio.destination);
+      o.start(t0); o.stop(t0 + 1);
+    } catch (e) {}
+  }
+
+  // ---------- interaction ----------
+  function select(i) {
+    sel = i;
+    render();
+  }
+  function snapshot() {
+    history.push({ board: S.board.slice(), notes: S.notes.slice(), combo: S.combo });
+    if (history.length > 300) history.shift();
+  }
+  function input(d) {
+    wake();
+    if (sel < 0) {
+      // Nothing selected yet: start at the first open cell.
+      const i = S.board.findIndex((v, k) => !v && S.puzzle[k] === 0);
+      if (i < 0) return;
+      sel = i;
+    }
+    if (S.puzzle[sel]) {
+      // Tapping a digit while a given is selected just highlights that digit elsewhere.
+      const i = S.board.findIndex(v => v === d);
+      if (i >= 0) sel = i;
+      render(); return;
+    }
+    if (S.notesMode) {
+      if (S.board[sel]) return;
+      snapshot();
+      S.notes[sel] ^= (1 << d);
+      save(); render(); return;
+    }
+    if (S.board[sel] === d) return;
+    if (S.board[sel] && S.board[sel] === S.solution[sel]) return; // correct digits stay put
+    snapshot();
+    S.board[sel] = d;
+    const el = cells[sel].el;
+    if (d === S.solution[sel]) {
+      S.notes[sel] = 0;
+      for (const p of PEERS[sel]) S.notes[p] &= ~(1 << d);
+      S.combo++;
+      S.bestCombo = Math.max(S.bestCombo, S.combo);
+      el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop");
+      if (S.combo >= 3) { comboEl.classList.remove("bump"); void comboEl.offsetWidth; comboEl.classList.add("bump"); }
+      note(S.combo - 1, .07);
+      const done = completedUnits(sel);
+      render();
+      if (done.length) ripple(sel, done);
+      if (S.board.every((v, k) => v === S.solution[k])) setTimeout(win, done.length ? 700 : 250);
+    } else {
+      S.mistakes++;
+      S.combo = 0;
+      el.classList.remove("shake"); void el.offsetWidth; el.classList.add("shake");
+      render();
+    }
+    save();
+  }
+  function completedUnits(i) {
+    const out = [];
+    for (const u of [UNIT.r[R(i)], UNIT.c[C(i)], UNIT.b[B(i)]]) if (u.every(k => S.board[k] === S.solution[k])) out.push(u);
+    return out;
+  }
+  function ripple(origin, units) {
+    const seen = new Set();
+    units.forEach(u => u.forEach(k => seen.add(k)));
+    seen.forEach(k => {
+      const dist = Math.abs(R(k) - R(origin)) + Math.abs(C(k) - C(origin));
+      const el = cells[k].el;
+      el.style.setProperty("--d", dist * 45 + "ms");
+      el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+    });
+    units.forEach((_, n) => note(S.combo + 4 + n * 2, .05, .08 * (n + 1)));
+  }
+  function erase() {
+    if (sel < 0 || S.puzzle[sel]) return;
+    if (S.board[sel] && S.board[sel] === S.solution[sel]) return;
+    if (!S.board[sel] && !S.notes[sel]) return;
+    snapshot();
+    S.board[sel] = 0; S.notes[sel] = 0;
+    save(); render();
+  }
+  function undo() {
+    const h = history.pop();
+    if (!h) return;
+    S.board = h.board; S.notes = h.notes; S.combo = h.combo;
+    save(); render();
+  }
+  function hint() {
+    let i = sel;
+    if (i < 0 || S.board[i] === S.solution[i]) {
+      // Reveal the most constrained open cell: the one a solver would look at next.
+      let best = -1, bestN = 10;
+      for (let k = 0; k < 81; k++) if (S.board[k] !== S.solution[k]) {
+        let m = 0x3FE;
+        for (const p of PEERS[k]) if (S.board[p] && S.board[p] === S.solution[p]) m &= ~(1 << S.board[p]);
+        const n = bits(m);
+        if (n < bestN) { bestN = n; best = k; }
+      }
+      i = best;
+    }
+    if (i < 0) return;
+    sel = i;
+    S.hints++;
+    const keep = S.combo, mode = S.notesMode;
+    S.notesMode = false;
+    input(S.solution[i]);
+    S.combo = keep; // hints neither build nor break a run
+    S.notesMode = mode;
+    save(); render();
+  }
+
+  // ---------- flow: win, adapt, continue ----------
+  function adapt() {
+    tick();
+    const slips = S.mistakes + S.hints * 1.5;
+    const mins = S.activeMs / 60000;
+    const par = 3 + S.level * 1.3; // rough minutes a comfortable solve takes at this level
+    let delta;
+    if (slips === 0 && mins < par) delta = .8;
+    else if (slips === 0) delta = .5;
+    else if (slips <= 2) delta = .2;
+    else if (slips <= 4) delta = -.3;
+    else delta = -.8;
+    const before = S.level;
+    S.level = Math.max(1, Math.min(10, S.level + delta));
+    return S.level - before;
+  }
+  function win() {
+    const d = adapt();
+    const n = S.solved;
+    S.solved++;
+    $("winEyebrow").textContent = `Island ${n + 1} charted`;
+    $("winTitle").textContent = `Landfall at ${islandName(n)}`;
+    $("wMistakes").textContent = S.mistakes;
+    $("wHints").textContent = S.hints;
+    $("wCombo").textContent = S.bestCombo;
+    const next = islandName(S.solved);
+    $("winNote").textContent = d > .05 ? `The wind rises: ${seaName(S.level).toLowerCase()} ahead. ${next} will give you fewer givens.`
+      : d < -.05 ? `The sea settles: ${seaName(S.level).toLowerCase()} ahead. ${next} will give you more to work with.`
+      : `Steady seas. ${next} is on the horizon.`;
+    const legDone = S.solved % 6 === 0;
+    const rest = $("restNote");
+    rest.hidden = !legDone;
+    if (legDone) rest.textContent = `Leg ${S.solved / 6} complete. Before you sail on, look at something far away for 20 seconds and roll your shoulders. Your eyes will thank you in hour six.`;
+    // Build the next island now so the handoff is instant.
+    nextGen = generate(S.level);
+    for (let d2 = 1; d2 <= 5; d2++) note(S.bestCombo + d2, .06, d2 * .09);
+    save();
+    winSheet.hidden = false;
+    renderVoyage();
+    startCountdown(legDone ? 22 : 6);
+  }
+  function startCountdown(secs) {
+    const btn = $("sailBtn"), label = $("sailLabel");
+    btn.style.setProperty("--dur", secs + "s");
+    btn.classList.remove("counting"); void btn.offsetWidth; btn.classList.add("counting");
+    let left = secs;
+    label.textContent = `Sail on (${left})`;
+    clearInterval(countdown);
+    countdown = setInterval(() => {
+      left--;
+      if (left <= 0) { sailOn(); return; }
+      label.textContent = `Sail on (${left})`;
+    }, 1000);
+  }
+  function sailOn() {
+    clearInterval(countdown);
+    winSheet.hidden = true;
+    $("sailBtn").classList.remove("counting");
+    const g = nextGen || generate(S.level);
+    nextGen = null;
+    S = Object.assign(S, {
+      puzzle: g.puzzle, solution: g.solution, clues: g.clues,
+      board: g.puzzle.slice(), notes: new Array(81).fill(0),
+      mistakes: 0, hints: 0, combo: 0, bestCombo: 0, activeMs: 0,
+    });
+    history = [];
+    sel = -1;
+    lastTick = Date.now();
+    save(); render();
+  }
+  function newPuzzle() {
+    nextGen = generate(S.level);
+    sailOn();
+  }
+
+  // ---------- keep the screen awake while playing ----------
+  let lock = null;
+  function wake() {
+    if (lock || !navigator.wakeLock || document.hidden) return;
+    navigator.wakeLock.request("screen").then(l => { lock = l; l.addEventListener("release", () => { lock = null; }); }).catch(() => {});
+  }
+  document.addEventListener("visibilitychange", () => { tick(); if (!document.hidden) wake(); });
+  setInterval(() => { tick(); save(); }, 15000);
+
+  // ---------- wiring ----------
+  $("undoBtn").onclick = undo;
+  $("eraseBtn").onclick = erase;
+  $("notesBtn").onclick = () => { S.notesMode = !S.notesMode; save(); render(); };
+  $("hintBtn").onclick = hint;
+  $("soundBtn").onclick = () => { S.sound = !S.sound; save(); render(); if (S.sound) note(4, .06); };
+  $("newBtn").onclick = newPuzzle;
+  $("sailBtn").onclick = sailOn;
+  $("stayBtn").onclick = () => { clearInterval(countdown); $("sailBtn").classList.remove("counting"); $("sailLabel").textContent = "Sail on"; winSheet.hidden = true; };
+  $("infoBtn").onclick = () => { infoSheet.hidden = false; };
+  $("infoClose").onclick = () => { infoSheet.hidden = true; };
+  infoSheet.addEventListener("pointerdown", e => { if (e.target === infoSheet) infoSheet.hidden = true; });
+  const shift = by => { S.level = Math.max(1, Math.min(10, S.level + by)); infoSheet.hidden = true; newPuzzle(); };
+  $("easierBtn").onclick = () => shift(-1.5);
+  $("harderBtn").onclick = () => shift(1.5);
+
+  document.addEventListener("keydown", e => {
+    if (!winSheet.hidden) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); sailOn(); } return; }
+    if (!infoSheet.hidden) { if (e.key === "Escape") infoSheet.hidden = true; return; }
+    const k = e.key;
+    if (k >= "1" && k <= "9") { input(+k); return; }
+    if (k === "Backspace" || k === "Delete" || k === "0") { erase(); return; }
+    if (k === "n" || k === "N") { S.notesMode = !S.notesMode; save(); render(); return; }
+    if ((k === "z" || k === "Z") && !e.shiftKey) { undo(); return; }
+    if (k === "h" || k === "H") { hint(); return; }
+    const mv = { ArrowUp: -9, ArrowDown: 9, ArrowLeft: -1, ArrowRight: 1 }[k];
+    if (mv) {
+      e.preventDefault();
+      if (sel < 0) { select(0); return; }
+      let r = R(sel), c = C(sel);
+      if (mv === -9) r = (r + 8) % 9; else if (mv === 9) r = (r + 1) % 9;
+      else if (mv === -1) c = (c + 8) % 9; else c = (c + 1) % 9;
+      select(r * 9 + c);
+    }
+  });
+
+  // Resume where you left off: if the saved board is already solved, go straight to the next island.
+  render();
+  if (S.board.every((v, k) => v === S.solution[k])) newPuzzle();
+})();
+</script>
+</html>
