@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Chain It</title>
+<!-- FONTS -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/bricolage-grotesque@5/700.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/bricolage-grotesque@5/800.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/figtree@5/400.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/figtree@5/600.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5/700.css">
+<!-- /FONTS -->
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- ===== SETUP ===== -->
+  <section class="screen setup" id="screen-setup">
+    <header class="brand">
+      <h1 class="logo" aria-label="Chain It">
+        <span class="lw">Chai<b>n</b></span><span class="lk" aria-hidden="true"></span><span class="lw it"><b>I</b>t</span>
+      </h1>
+      <p class="tagline">Say a word. The next one starts where yours ends. Beat the clock or lose a link.</p>
+    </header>
+
+    <form id="setup-form" class="setup-form" autocomplete="off">
+      <fieldset class="block">
+        <legend>Players</legend>
+        <ol class="players-edit" id="players-edit"></ol>
+        <div class="row">
+          <button type="button" class="btn ghost" id="add-player">Add player</button>
+          <button type="button" class="btn ghost" id="add-cpu">Add computer</button>
+        </div>
+        <label class="field inline" id="cpu-level-field">
+          <span>Computer skill</span>
+          <select id="cpu-level">
+            <option value="easy">Easy</option>
+            <option value="normal" selected>Normal</option>
+            <option value="hard">Hard (plays trap letters)</option>
+          </select>
+        </label>
+      </fieldset>
+
+      <fieldset class="block">
+        <legend>Game mode</legend>
+        <div class="modes" id="modes"></div>
+      </fieldset>
+
+      <fieldset class="block">
+        <legend>Rules</legend>
+        <div class="grid2">
+          <label class="field">
+            <span id="time-label">Time per turn</span>
+            <select id="time-limit">
+              <option value="5">5 seconds</option>
+              <option value="8">8 seconds</option>
+              <option value="10" selected>10 seconds</option>
+              <option value="15">15 seconds</option>
+              <option value="20">20 seconds</option>
+              <option value="30">30 seconds</option>
+            </select>
+          </label>
+          <label class="field" id="lives-field">
+            <span>Lives</span>
+            <select id="lives">
+              <option value="1">1 (sudden death)</option>
+              <option value="2">2</option>
+              <option value="3" selected>3</option>
+              <option value="5">5</option>
+            </select>
+          </label>
+          <label class="field" id="rounds-field">
+            <span>Rounds</span>
+            <select id="rounds">
+              <option value="3">3</option>
+              <option value="5" selected>5</option>
+              <option value="8">8</option>
+              <option value="10">10</option>
+            </select>
+          </label>
+        </div>
+        <label class="check"><input type="checkbox" id="opt-dict" checked> <span>Check words online <small>(falls back to challenges when offline)</small></span></label>
+        <label class="check"><input type="checkbox" id="opt-handoff" checked> <span>Pass-the-phone screen between players</span></label>
+        <label class="check"><input type="checkbox" id="opt-sound" checked> <span>Sound</span></label>
+      </fieldset>
+
+      <button type="submit" class="btn primary big" id="start-btn">Start chain</button>
+    </form>
+
+    <details class="guide">
+      <summary>How to play and how to win</summary>
+      <div class="guide-body">
+        <h3>The basics</h3>
+        <ul>
+          <li>Player 1 opens with any word.</li>
+          <li>Every next word must start with the <b>last letter</b> of the word before it. <span class="eg">tiger → rabbit → tomato</span></li>
+          <li>No repeats. Once a word is in the chain it is gone for the game.</li>
+          <li>Run out of time and you lose a life. The next player gets the same letter.</li>
+          <li>Wrong words don't cost a life, but the clock keeps running while you retry.</li>
+          <li>Last player with lives left wins.</li>
+        </ul>
+        <h3>Modes</h3>
+        <dl id="guide-modes"></dl>
+        <h3>How to win</h3>
+        <ul>
+          <li><b>End on a trap letter.</b> Few English words start with X, Q, Z, J, K or Y. Words like <i>fox</i>, <i>jazz</i>, <i>ivy</i> or <i>kiosk</i> hand your opponent a tough start.</li>
+          <li><b>Drain a letter.</b> Each letter has a limited supply of easy words. Once the easy X or Y words are used, ending on that letter gets deadlier every time.</li>
+          <li><b>Avoid giving back easy letters.</b> S, T, C, P and B start thousands of words. Ending there helps the next player.</li>
+          <li><b>Keep rescue words ready.</b> Memorize two or three words for each hard letter: <i>xylophone</i>, <i>quiz</i>, <i>zebra</i>, <i>yacht</i>, <i>jungle</i>. Panic loses more games than vocabulary does.</li>
+          <li><b>Watch for bounce-backs.</b> If the only answer you can think of ends on the same trap letter, you can send the trap straight back.</li>
+          <li><b>Challenge doubtful words.</b> When a word can't be checked online, anyone can tap <em>Challenge</em>. A successful challenge costs the player who made it up a life.</li>
+        </ul>
+      </div>
+    </details>
+  </section>
+
+  <!-- ===== PLAY ===== -->
+  <section class="screen play" id="screen-play" hidden>
+    <header class="topbar">
+      <button class="btn icon" id="quit-btn" type="button" aria-label="End game">✕</button>
+      <div class="scoreboard" id="scoreboard"></div>
+    </header>
+
+    <div class="chain-wrap">
+      <ol class="chain" id="chain" aria-live="polite"></ol>
+      <p class="chain-empty" id="chain-empty">The chain is empty. Open with any word.</p>
+    </div>
+
+    <div class="dock">
+      <div class="turn">
+        <div class="clock" id="clock">
+          <svg viewBox="0 0 100 100" aria-hidden="true">
+            <circle class="track" cx="50" cy="50" r="44"></circle>
+            <circle class="fill" id="clock-fill" cx="50" cy="50" r="44" pathLength="100"></circle>
+          </svg>
+          <div class="need" id="need">?</div>
+        </div>
+        <div class="turn-info">
+          <div class="who" id="who">Player 1</div>
+          <div class="rules-line" id="rules-line"></div>
+          <div class="secs" id="secs">10.0</div>
+        </div>
+      </div>
+      <form class="entry" id="entry-form" autocomplete="off">
+        <input id="word-input" type="text" inputmode="text" enterkeyhint="send"
+               autocapitalize="off" autocorrect="off" spellcheck="false"
+               placeholder="Type a word" aria-label="Your word" maxlength="30">
+        <button class="btn primary" type="submit" id="submit-btn">Chain</button>
+      </form>
+      <p class="msg" id="msg" role="status"></p>
+    </div>
+
+    <div class="overlay" id="handoff" hidden>
+      <div class="overlay-card">
+        <p class="eyebrow">Pass the phone to</p>
+        <p class="handoff-name" id="handoff-name">Player 2</p>
+        <p class="handoff-need" id="handoff-need"></p>
+        <button class="btn primary big" type="button" id="ready-btn">I'm ready</button>
+      </div>
+    </div>
+
+    <div class="overlay" id="confirm-quit" hidden>
+      <div class="overlay-card">
+        <p class="handoff-name small">End this game?</p>
+        <div class="row center">
+          <button class="btn ghost" type="button" id="quit-no">Keep playing</button>
+          <button class="btn danger" type="button" id="quit-yes">End game</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== GAME OVER ===== -->
+  <section class="screen over" id="screen-over" hidden>
+    <p class="eyebrow">Chain broken</p>
+    <h2 class="winner" id="winner">Player 1 wins</h2>
+    <div class="stats" id="stats"></div>
+    <ol class="standings" id="standings"></ol>
+    <h3 class="sub">The full chain</h3>
+    <p class="final-chain" id="final-chain"></p>
+    <div class="row">
+      <button class="btn primary big" type="button" id="rematch-btn">Rematch</button>
+      <button class="btn ghost big" type="button" id="setup-btn">Change setup</button>
+    </div>
+  </section>
+
+</div>
+<script src="words.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
