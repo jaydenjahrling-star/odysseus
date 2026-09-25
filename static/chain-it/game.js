@@ -7,7 +7,7 @@
   const WORDS = window.CHAIN_IT_WORDS || [];
   const WORDSET = new Set(WORDS);
   const $ = (id) => document.getElementById(id);
-  const STORE_KEY = "chain-it:setup";
+  const STORE_KEY = "chain-it:setup:v2";
 
   // Letters that start few English words. Ending on one pressures the next player.
   const END_BONUS = { x: 6, q: 6, z: 5, j: 5, k: 3, y: 3, v: 3, u: 2, i: 1, o: 1, n: 1 };
@@ -61,8 +61,9 @@
       players: [{ name: "Player 1", cpu: false }, { name: "Player 2", cpu: false }],
       cpuLevel: "normal",
       mode: "classic",
-      time: 10,
-      lives: 3,
+      time: 8,
+      lives: 2,
+      strict: true,
       rounds: 5,
       dict: true,
       handoff: true,
@@ -139,6 +140,7 @@
     $("lives").value = String(setup.lives);
     $("rounds").value = String(setup.rounds);
     $("opt-dict").checked = setup.dict;
+    $("opt-strict").checked = setup.strict;
     $("opt-handoff").checked = setup.handoff;
     $("opt-sound").checked = setup.sound;
     syncModeFields();
@@ -174,6 +176,7 @@
     bindSel("rounds", "rounds", true);
     const bindChk = (id, key) => $(id).addEventListener("change", (e) => { setup[key] = e.target.checked; saveSetup(); });
     bindChk("opt-dict", "dict");
+    bindChk("opt-strict", "strict");
     bindChk("opt-handoff", "handoff");
     bindChk("opt-sound", "sound");
     $("setup-form").addEventListener("submit", (e) => { e.preventDefault(); startGame(); });
@@ -189,6 +192,7 @@
       maxLives: s.mode === "points" ? 0 : s.lives,
       rounds: s.rounds,
       dict: s.dict,
+      strict: s.strict,
       handoff: s.handoff,
       cpuLevel: s.cpuLevel,
       players: s.players.map((p, i) => ({
@@ -257,12 +261,10 @@
     const humans = G.players.filter((x) => !x.cpu).length;
     const needHandoff = G.handoff && !p.cpu && humans > 1 && G.lastHuman !== G.turn && !(first && G.turn === 0);
     if (needHandoff) {
+      // The letter stays hidden until the player starts their turn.
       G.phase = "handoff";
+      renderTurn();
       $("handoff-name").textContent = p.name;
-      const need = needed();
-      $("handoff-need").innerHTML = need
-        ? `Your word starts with <b>${esc(need)}</b>`
-        : "You open the chain with any word.";
       $("handoff").hidden = false;
       $("ready-btn").focus();
       stopClock();
@@ -387,8 +389,17 @@
     const need = needed();
     if (need && !w.startsWith(need)) return `It has to start with “${need.toUpperCase()}”.`;
     if (w.length < minLen()) return `Words need at least ${minLen()} letters right now.`;
-    if (G.used.has(w)) return `“${w}” is already in the chain.`;
+    const rep = repeatOf(w);
+    if (rep) return rep === w ? `“${w}” was already used.` : `“${w}” repeats “${rep}”.`;
     return "";
+  }
+
+  // A word counts as a repeat if it, or its simple singular/plural form, was already played.
+  function repeatOf(w) {
+    const forms = [w, w + "s", w + "es"];
+    if (w.endsWith("es")) forms.push(w.slice(0, -2));
+    if (w.endsWith("s")) forms.push(w.slice(0, -1));
+    return forms.find((f) => G.used.has(f)) || "";
   }
 
   async function submitWord(raw) {
@@ -398,7 +409,7 @@
     const w = raw.trim().toLowerCase();
     if (!w) return;
     const err = ruleError(w);
-    if (err) { reject(err); return; }
+    if (err) { mistake(err); return; }
 
     let verified = WORDSET.has(w);
     if (!verified && G.dict) {
@@ -406,11 +417,24 @@
       setMsg("Checking the dictionary…");
       const res = await lookup(w);
       if (!G || G.phase !== "checking") return;
-      if (res === false) { resumeClock(); reject(`“${w}” isn't in the dictionary.`); return; }
+      if (res === false) { resumeClock(); mistake(`“${w}” isn't in the dictionary.`); return; }
       verified = res === true;
       resumeClock();
     }
     accept(w, verified);
+  }
+
+  // Strict rules: any mistake ends the turn and costs a life (or points).
+  function mistake(text) {
+    if (!G.strict) { reject(text); return; }
+    stopClock();
+    clearTimeout(cpuTimer);
+    const p = G.players[G.turn];
+    beep(160, 0.35, 0.12, "sawtooth");
+    penalize(p, `slipped (${text.replace(/\.$/, "").replace(/^[A-Z]/, (c) => c.toLowerCase())})`);
+    $("word-input").value = "";
+    endTurn();
+    setMsg(text, "bad");
   }
 
   function reject(text) {
@@ -511,7 +535,7 @@
   function cpuPick(level) {
     const need = needed();
     const min = minLen();
-    const ok = WORDS.filter((w) => w.startsWith(need) && w.length >= min && !G.used.has(w) && !(G.trap && w.endsWith(G.trap)));
+    const ok = WORDS.filter((w) => w.startsWith(need) && w.length >= min && !repeatOf(w) && !(G.trap && w.endsWith(G.trap)));
     if (!ok.length) return null;
     if (level !== "hard") return ok[Math.floor(Math.random() * ok.length)];
     // Hard: pick the word that leaves the next player the fewest options.
@@ -520,7 +544,7 @@
     const options = (w) => {
       const next = w.slice(-L);
       let n = 0;
-      for (const x of WORDS) if (x !== w && x.startsWith(next) && x.length >= nextMin && !G.used.has(x)) n++;
+      for (const x of WORDS) if (x !== w && x.startsWith(next) && x.length >= nextMin && !repeatOf(x)) n++;
       return n;
     };
     let best = null, bestN = Infinity;
@@ -618,10 +642,11 @@
   function renderTurn() {
     const p = G.players[G.turn];
     $("who").textContent = p.cpu ? `${p.name}` : `${p.name}'s turn`;
-    const need = needed();
+    const hide = G.phase === "handoff";
+    const need = hide ? "" : needed();
     const needEl = $("need");
-    needEl.textContent = need ? need.toUpperCase() : "Any word";
-    needEl.classList.toggle("open", !need);
+    needEl.textContent = hide ? "?" : need ? need.toUpperCase() : "Any word";
+    needEl.classList.toggle("open", !need && !hide);
     const bits = [];
     bits.push(`min <b>${minLen()}</b> letters`);
     if (G.trap) bits.push(`don't end on <b>${G.trap.toUpperCase()}</b>`);
@@ -635,7 +660,7 @@
     const human = !p.cpu;
     $("word-input").disabled = !human;
     $("submit-btn").disabled = !human;
-    $("word-input").placeholder = human ? (need ? `Starts with ${need.toUpperCase()}…` : "Any word to start") : "Computer's turn";
+    $("word-input").placeholder = hide ? "" : human ? (need ? `Starts with ${need.toUpperCase()}…` : "Any word to start") : "Computer's turn";
     paintClock();
   }
 

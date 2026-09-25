@@ -56,8 +56,8 @@
             <span id="time-label">Time per turn</span>
             <select id="time-limit">
               <option value="5">5 seconds</option>
-              <option value="8">8 seconds</option>
-              <option value="10" selected>10 seconds</option>
+              <option value="8" selected>8 seconds</option>
+              <option value="10">10 seconds</option>
               <option value="15">15 seconds</option>
               <option value="20">20 seconds</option>
               <option value="30">30 seconds</option>
@@ -67,8 +67,8 @@
             <span>Lives</span>
             <select id="lives">
               <option value="1">1 (sudden death)</option>
-              <option value="2">2</option>
-              <option value="3" selected>3</option>
+              <option value="2" selected>2</option>
+              <option value="3">3</option>
               <option value="5">5</option>
             </select>
           </label>
@@ -83,6 +83,7 @@
           </label>
         </div>
         <label class="check"><input type="checkbox" id="opt-dict" checked> <span>Check words online <small>(falls back to challenges when offline)</small></span></label>
+        <label class="check"><input type="checkbox" id="opt-strict" checked> <span>Any mistake costs a life <small>(wrong letter, repeat, not a word)</small></span></label>
         <label class="check"><input type="checkbox" id="opt-handoff" checked> <span>Pass-the-phone screen between players</span></label>
         <label class="check"><input type="checkbox" id="opt-sound" checked> <span>Sound</span></label>
       </fieldset>
@@ -97,9 +98,9 @@
         <ul>
           <li>Player 1 opens with any word.</li>
           <li>Every next word must start with the <b>last letter</b> of the word before it. <span class="eg">tiger → rabbit → tomato</span></li>
-          <li>No repeats. Once a word is in the chain it is gone for the game.</li>
+          <li>No repeats. Once a word is in the chain it is gone for the game, and so is its plural or singular (<i>cat</i> blocks <i>cats</i>).</li>
           <li>Run out of time and you lose a life. The next player gets the same letter.</li>
-          <li>Wrong words don't cost a life, but the clock keeps running while you retry.</li>
+          <li>Any mistake costs a life right away: wrong starting letter, a repeat, a word that's too short or not a real word. Turn this off in Rules to allow retries while the clock runs.</li>
           <li>Last player with lives left wins.</li>
         </ul>
         <h3>Modes</h3>
@@ -157,7 +158,7 @@
       <div class="overlay-card">
         <p class="eyebrow">Pass the phone to</p>
         <p class="handoff-name" id="handoff-name">Player 2</p>
-        <p class="handoff-need" id="handoff-need"></p>
+        <p class="handoff-need" id="handoff-need">Your letter shows when you tap. The clock starts right away.</p>
         <button class="btn primary big" type="button" id="ready-btn">I'm ready</button>
       </div>
     </div>
